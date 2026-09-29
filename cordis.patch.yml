@@ -1,15 +1,15 @@
-# Layer owned by the `dsh-session-title-first-turn` bundle.
+# Layer owned by the `dsh-rename-title-after-first-turn` bundle.
 #
 # 一行装配：`name` 写**包名**，DSH 从 profile 的 node_modules 里解析它。
 # 正确装法（会把本 bundle 记进 `dsh.profile.bundles`，无需手工编辑 profile 文件）：
-#   dsh plugin --profile <profile> add dsh-session-title-first-turn
+#   dsh plugin --profile <profile> add dsh-rename-title-after-first-turn
 #
 # ⚠️ 按包名安装的前提是 `package.json` 的 `dsh.bundle.patch` 指向本文件；没有这个声明的包，
 #    plugin manager 会**回滚整次安装**。
 # ⚠️ 不要同时保留两种装法（本文件的包名行 + profile 里指向绝对路径的 insert 行），否则会出现两行同名 entry。
 - insert:
     - id: session-title-first-turn
-      name: "dsh-session-title-first-turn"
+      name: "dsh-rename-title-after-first-turn"
       # config 全部可选；下面列出的是默认值，按需改。
       # 语义与取值范围见 README 的「配置」表；非法值一律回退缺省，不抛错。
       # config:

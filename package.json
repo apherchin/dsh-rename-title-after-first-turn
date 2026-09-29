@@ -1,5 +1,5 @@
 {
-	"name": "dsh-session-title-first-turn",
+	"name": "dsh-rename-title-after-first-turn",
 	"version": "0.1.0",
 	"description": "DSH host-only plugin: name a main session once, right after its first turn ends. Subagent and teammate sessions are left alone.",
 	"type": "module",
@@ -42,12 +42,12 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/apherchin/dsh-session-title-first-turn.git"
+		"url": "git+https://github.com/apherchin/dsh-rename-title-after-first-turn.git"
 	},
 	"bugs": {
-		"url": "https://github.com/apherchin/dsh-session-title-first-turn/issues"
+		"url": "https://github.com/apherchin/dsh-rename-title-after-first-turn/issues"
 	},
-	"homepage": "https://github.com/apherchin/dsh-session-title-first-turn#readme",
+	"homepage": "https://github.com/apherchin/dsh-rename-title-after-first-turn#readme",
 	"engines": {
 		"node": ">=20"
 	}

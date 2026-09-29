@@ -1,4 +1,4 @@
-# dsh-session-title-first-turn
+# dsh-rename-title-after-first-turn
 
 [中文](#中文) ｜ [English](#english)
 
@@ -24,17 +24,17 @@ DSH 自带的兜底命名是「首条消息截到 40 字节」，经常读起来
 ### 安装
 
 ```bash
-dsh plugin --profile <你的 profile> add dsh-session-title-first-turn
+dsh plugin --profile <你的 profile> add dsh-rename-title-after-first-turn
 ```
 
 包内声明了 `dsh.bundle.patch`，所以 `dsh plugin` 会**自动把它记进 `dsh.profile.bundles`**，无需手工编辑 profile 文件。然后重启 DSH（打包版没有「刷新页面」）。
 
-手动兜底（不用 `dsh plugin` 时）：`pnpm add dsh-session-title-first-turn`，再在 `cordis.patch.yml` 追加
+手动兜底（不用 `dsh plugin` 时）：`pnpm add dsh-rename-title-after-first-turn`，再在 `cordis.patch.yml` 追加
 
 ```yaml
 - insert:
     - id: session-title-first-turn
-      name: "dsh-session-title-first-turn"
+      name: "dsh-rename-title-after-first-turn"
 ```
 
 > 可选：想让本插件**独占命名权**，同时停用内置的 first-prompt provider（把 `- id: session-title-llm` + `disabled: true` 加进 profile 补丁）。包里的 `cordis.patch.yml` 有这两行的注释版本——**默认不启用**，因为它会改变别人的默认行为。
@@ -87,7 +87,7 @@ Get-ChildItem test -Filter '*.test.mjs' | ForEach-Object { node $_.FullName; "ex
 
 ### 停用 / 卸载
 
-- **按包名装的**：`dsh plugin --profile <你的 profile> remove dsh-session-title-first-turn`
+- **按包名装的**：`dsh plugin --profile <你的 profile> remove dsh-rename-title-after-first-turn`
 - **按绝对路径 insert 装的**：从 `~\.dsh\profiles\<profile>\cordis.patch.yml` 删掉 `id: session-title-first-turn` 那条 `insert`
 - 两种都要**重启 DSH**（已加载插件文件的内容改动不热重载）。
 
@@ -106,7 +106,7 @@ A **host-only** DSH plugin that names a main session **once**, right after its f
 ### Install
 
 ```bash
-dsh plugin --profile <your-profile> add dsh-session-title-first-turn
+dsh plugin --profile <your-profile> add dsh-rename-title-after-first-turn
 ```
 
 The package declares `dsh.bundle.patch`, so `dsh plugin` also records it in `dsh.profile.bundles` — no profile file editing. Restart DSH afterwards.
