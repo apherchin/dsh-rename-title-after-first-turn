@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "首轮自动命名",
+    "description": "主会话「第一轮结束」后用模型总结一次标题，此后不再改；subagent / teammate 会话一律不碰。"
+  }
+}

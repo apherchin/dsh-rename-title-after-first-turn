@@ -1,0 +1,54 @@
+{
+	"name": "dsh-session-title-first-turn",
+	"version": "0.1.0",
+	"description": "DSH host-only plugin: name a main session once, right after its first turn ends. Subagent and teammate sessions are left alone.",
+	"type": "module",
+	"main": "index.mjs",
+	"icon": "./icon.svg",
+	"publishConfig": {
+		"access": "public"
+	},
+	"exports": {
+		".": "./index.mjs",
+		"./cordis.patch.yml": "./cordis.patch.yml",
+		"./locale/*.json": "./locale/*.json",
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"index.mjs",
+		"lib/*.mjs",
+		"cordis.patch.yml",
+		"icon.svg",
+		"locale/*.json"
+	],
+	"dsh": {
+		"bundle": {
+			"patch": "./cordis.patch.yml"
+		}
+	},
+	"keywords": [
+		"dsh",
+		"deepseek-harness",
+		"cordis",
+		"dsh-plugin",
+		"plugin",
+		"session",
+		"title",
+		"auto-title"
+	],
+	"license": "MIT",
+	"author": {
+		"name": "apherchin"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/apherchin/dsh-session-title-first-turn.git"
+	},
+	"bugs": {
+		"url": "https://github.com/apherchin/dsh-session-title-first-turn/issues"
+	},
+	"homepage": "https://github.com/apherchin/dsh-session-title-first-turn#readme",
+	"engines": {
+		"node": ">=20"
+	}
+}

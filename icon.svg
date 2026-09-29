@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Auto session title">
+  <rect width="64" height="64" rx="14" fill="#247bbf"/>
+  <g fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 24h28"/>
+    <path d="M18 34h18"/>
+    <path d="M18 44h11"/>
+    <path d="M45.2 29.8l1.9 5.2 5.2 1.9-5.2 1.9-1.9 5.2-1.9-5.2-5.2-1.9 5.2-1.9z" fill="#ffffff" stroke="none"/>
+  </g>
+</svg>

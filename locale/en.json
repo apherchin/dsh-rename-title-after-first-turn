@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Auto session title",
+    "description": "Summarizes a session's title once, right after its first turn ends, and never again. Subagent and teammate sessions are left alone."
+  }
+}
