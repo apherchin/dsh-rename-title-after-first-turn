@@ -4,6 +4,20 @@
 
 主会话「第一轮对话结束后，自动总结命名**一次**」的 **host-only** DSH 插件（不改 `app.asar`，无 client 半边）。
 
+> ## ⛔ 已退役（2026-10-04）· Retired
+>
+> **中文**：DSH **0.2.0** 起，会话标题变成**可插拔提供方 seam**（`ctx.sessionTitle.register(provider)`），
+> 官方随包就带提供方；本插件原先靠"停用官方 provider + 自己 append `session/title`"来实现，
+> 继续维护的收益不足。因此已**从本机 profile 停用**：`cordis.patch.yml` 里那段 `insert` 已整块注释掉，
+> 同时**恢复启用**官方 `session-title-llm`（原来那条 `disabled: true` 已删除）。
+> **代码与全部测试原样保留**，需要时可回退（去掉 insert 注释 + 重启 DSH）。
+> 审计：`Day1\reports\dsh-0.2.0升级-自建资产覆盖度审计-20261004.md`。
+>
+> **English**: As of DSH **0.2.0** session titles are a pluggable provider seam
+> (`ctx.sessionTitle.register(provider)`) with providers shipped in the box, so this plugin is **retired**:
+> its profile `insert` is commented out and the official `session-title-llm` provider is re-enabled.
+> The code and its test suite are kept unchanged for rollback.
+
 ---
 
 ## 中文
