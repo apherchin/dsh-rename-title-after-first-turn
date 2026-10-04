@@ -4,19 +4,27 @@
 
 主会话「第一轮对话结束后，自动总结命名**一次**」的 **host-only** DSH 插件（不改 `app.asar`，无 client 半边）。
 
-> ## ⛔ 已退役（2026-10-04）· Retired
+> ## ✅ 在用（2026-10-04 恢复）· Active
 >
-> **中文**：DSH **0.2.0** 起，会话标题变成**可插拔提供方 seam**（`ctx.sessionTitle.register(provider)`），
-> 官方随包就带提供方；本插件原先靠"停用官方 provider + 自己 append `session/title`"来实现，
-> 继续维护的收益不足。因此已**从本机 profile 停用**：`cordis.patch.yml` 里那段 `insert` 已整块注释掉，
-> 同时**恢复启用**官方 `session-title-llm`（原来那条 `disabled: true` 已删除）。
-> **代码与全部测试原样保留**，需要时可回退（去掉 insert 注释 + 重启 DSH）。
-> 审计：`Day1\reports\dsh-0.2.0升级-自建资产覆盖度审计-20261004.md`。
+> **中文**：本插件曾在 2026-10-04 短暂退役（当时判断"DSH 0.2.0 已把标题做成可插拔 seam，官方接替就够了"）。
+> **同一天恢复**，因为把官方 provider 在本机的失败原因查实了：
 >
-> **English**: As of DSH **0.2.0** session titles are a pluggable provider seam
-> (`ctx.sessionTitle.register(provider)`) with providers shipped in the box, so this plugin is **retired**:
-> its profile `insert` is commented out and the official `session-title-llm` provider is re-enabled.
-> The code and its test suite are kept unchanged for rollback.
+> - 官方 `session-title-first-prompt-llm` **只在首条人类消息时运行**，且只把**那一条提问**发出去（`messageSeqs:[首条]`），看不到本轮助手干了什么；
+> - 它预算固定 **`maxOutputTokens: 64`**；而"按 `purpose: 'session-title'` 关掉思考"是**适配器职责**，
+>   本机建模走 `llm-pi-ai`（本地 OpenAI-Responses 代理）**没有这条行为**，而 `deepseek-v4.1-flash` 的思考在配置里**不可关闭**
+>   ⇒ 64 token 被 reasoning 全部吃光（实测 `status: incomplete` / `reasoning_tokens: 64` / 无 message）⇒ 会话永远停在 fallback。
+>   对照组：同一请求放宽到 1024 token 即正常返回标题。
+>
+> 因此现在**两条一起**：profile 里 `session-title-llm: disabled: true`（跳过官方）+ 本插件启用。
+> 本插件写出的 `session/title` 在更后的 seq 上 ⇒ 即使官方那条侥幸成功也会被覆盖。
+> 复现脚本：`Day1\work\post-0.2.0-cleanup-20261004\probe-title-request.mjs`；完整分析：`Day1\reports\dsh-0.2.0升级-自建资产覆盖度审计-20261004.md` §9。
+>
+> **English**: Briefly retired on 2026-10-04, then **reactivated the same day** once the official provider's
+> failure on this machine was pinned down: it fires only on the first human message (sending that message alone),
+> with a fixed `maxOutputTokens: 64`, and the "disable thinking for `purpose: 'session-title'`" behaviour lives in
+> the **DeepSeek adapter** — our route is `llm-pi-ai`, whose model cannot turn thinking off, so all 64 tokens go to
+> reasoning and the provider gets empty output. The official provider is therefore disabled in the profile and
+> this plugin owns naming (its later-seq `session/title` also overrides a lucky official one).
 
 ---
 
@@ -24,7 +32,7 @@
 
 ### 它解决什么
 
-DSH 自带的兜底命名是「首条消息截到 40 字节」，经常读起来不像个标题；而内置的 first-prompt 标题 provider 在本机**近乎必失败**。本插件在**第一轮真正结束之后**（已有提问、已有回答）用一次模型调用总结出标题，**此后永久不再改**。
+DSH 自带的兜底命名是「首条消息截到 40 字节」，经常读起来不像个标题；而内置的 first-prompt 标题 provider 在本机**必失败**——根因已查实：它只给 `maxOutputTokens: 64`，而"按 `purpose` 关掉思考"是**适配器职责**，本机 pi-ai 路由没有这条行为、`deepseek-v4.1-flash` 的思考又关不掉 ⇒ 64 token 全被 reasoning 吃光（详见顶部说明与报告 §9）。本插件在**第一轮真正结束之后**（已有提问、已有回答）用一次模型调用总结出标题，**此后永久不再改**。
 
 ### 行为
 
@@ -60,7 +68,7 @@ dsh plugin --profile <你的 profile> add dsh-rename-title-after-first-turn
 | `targetCjkCharacters` | 12 | 1–60 | 中文目标字数 |
 | `targetWords` | 6 | 1–30 | 非中文目标词数 |
 | `maxInputBytes` | 8192 | 256–1000000 | 素材字节上限（分数向下取整） |
-| `maxOutputTokens` | 2048 | 32–32000 | 输出上限（内置 provider 是 64，疑似被推理 token 吃光 ⇒ 本机 28/30 失败） |
+| `maxOutputTokens` | 2048 | 32–32000 | 输出上限。**别照抄官方的 64**：本机路由关不掉思考，64 会被 reasoning 吃光（已实测：64 → `status: incomplete`、一个标题字都没有；1024 → 正常返回标题） |
 | `timeoutMs` | 60000 | 1000–900000 | 端到端超时；是**硬边界**（`Promise.race`），适配器不看 `signal` 也会返回 |
 | `maxAttempts` | 3 | 1–10 | 每个会话最多尝试次数（1 = 只试第一轮）。**含「无路由」那种没打到模型的尝试** |
 | `maxTitleBytes` | 80 | 8–512 | 落库标题的 UTF-8 字节上限 |
@@ -69,9 +77,10 @@ dsh plugin --profile <你的 profile> add dsh-rename-title-after-first-turn
 
 ### 兼容性
 
-- **实测环境**：DSH 桌面壳 `0.1.7-rc.2`（Windows）。
+- **实测环境**：DSH 桌面壳 **`0.2.0-rc.2`**（Windows，2026-10-04 复核）；历史记录：`0.1.7-rc.2` 亦可用。
+- **与官方 provider 的关系**：本插件与会 `first-prompt` 节奏的官方 provider 功能重叠，本机做法是**关掉官方**（见顶部说明）。0.2.0 起官方标题服务是**可插拔 seam**（`ctx.sessionTitle.register(provider)`，第二次注册会立即抛错），但本插件**不使用**该 seam——它直接 append 官方 `session/title`，因此不受"只能注册一个 provider"的约束，也能与官方共存（谁 seq 大谁赢）。
 - **host-only**：没有 client 半边 ⇒ **不参与**渲染端「每条 client entry 必须 active」的全有全无启动门禁。
-- 用到的服务：`llm`（`ctx.llm.stream`）；订阅 `session/event`、`session/disposed`。
+- 用到的服务：`llm`（`ctx.llm.stream`）；订阅 `session/event`、`session/disposed`。0.2.0 起 `snapshotEvents`/`eventAt`/`ownEvents` 被弃用，但本插件**不读会话日志**，因此不受影响。
 - 零 npm 依赖、无安装脚本、无构建步骤。
 
 ### 合规（按官方 `cordis-plugin-development` 对齐）
