@@ -34,6 +34,47 @@
 
 DSH 自带的兜底命名是「首条消息截到 40 字节」，经常读起来不像个标题；而内置的 first-prompt 标题 provider 在本机**必失败**——根因已查实：它只给 `maxOutputTokens: 64`，而"按 `purpose` 关掉思考"是**适配器职责**，本机 pi-ai 路由没有这条行为、`deepseek-v4.1-flash` 的思考又关不掉 ⇒ 64 token 全被 reasoning 吃光（详见顶部说明与报告 §9）。本插件在**第一轮真正结束之后**（已有提问、已有回答）用一次模型调用总结出标题，**此后永久不再改**。
 
+### 与官方 first-prompt provider 的区别（2026-10-04 实测）
+
+DSH 0.2.0 起自带 `@deepseek-ai/dsh-session-title-first-prompt-llm`（下称"官方"）。两者写的是**同一种**事件
+（`session/title`，`source.kind = "provider"`），因此可以共存（higher-seq-wins），但行为差别很大：
+
+| | 官方 first-prompt | 本插件 first-turn |
+|---|---|---|
+| **触发时机** | **首条符合条件的人类消息**到达时（助手回答还不存在） | `turn/end` 且 `turn >= 1`（本轮回答结束之后） |
+| **送进模型的素材** | **只有那一条人类消息**（会话日志实测载荷 `messageSeqs:[首条]`） | **首轮提问 + 首轮回答正文**，包成一条 JSON（提问优先占预算 60%，截断处补 `…(已截断)`） |
+| **输入上限** | `maxInputBytes: 4096` | `maxInputBytes` 默认 **8192**（可配 256–1,000,000） |
+| **输出上限** | **64 token** | **2048 token** |
+| **怎么关掉"思考"** | 靠**适配器**按封套上的 `purpose: 'session-title'` 关闭——只有官方 DeepSeek 适配器实现了这条 | 不依赖任何适配器特殊行为；预算足够容纳思考 |
+| **失败之后** | 保留 fallback，**不自动重试**（只能显式 `ctx.sessionTitle.refresh()`） | 最多自动重试 `maxAttempts`（默认 3），用尽后静默放弃 |
+| **fork / 子会话** | fork 会话不自动跑（继承种子标题） | 只认**主会话**（`parentSession` 空、`delegationDepth` 为 0）；子代理 / 队友 / fork 一律不碰 |
+| **本机实测结果** | **必失败**：`status: incomplete`、`reasoning_tokens: 64`、无输出 ⇒ 会话永远停在 fallback | 稳定成功（实例：「抖音账号管理器编码代理会话」） |
+
+#### 官方在本机为什么必失败（复现记录）
+
+1. 官方预算固定 **64 token**；
+2. 它靠封套上的 `purpose: 'session-title'` 让**适配器**关掉思考（官方文档原话：*DeepSeek 适配器根据该用途禁用思考……其他适配器负责自身用途专用行为*）；
+3. 本机建模走的是 **pi-ai 路由**（`llm-pi-ai` → 本地 OpenAI-Responses 代理），**不是**官方 DeepSeek 适配器 ⇒ 没有这条 purpose 行为；
+4. 而 `deepseek-v4.1-flash` 的 reasoning 在本机配置里**不可关闭** ⇒ **64 token 全被思考吃光**，模型一个标题字都没写出来。
+
+把同一条请求直接打给本地代理（复现脚本 `probe-title-request.mjs`）：
+
+| `max_output_tokens` | HTTP | status | usage | 输出 |
+|---|---|---|---|---|
+| **64**（官方默认值） | 200 | `incomplete` | `output_tokens: 64`，其中 **`reasoning_tokens: 64`** | **无 message**（预算全给了思考） |
+| 1024 | 200 | `completed` | `output_tokens: 101`（reasoning 97） | 正常标题 |
+
+⇒ 不是模型或网络问题，而是"**官方默认 64 token 预算 × 本机路由关不掉思考**"的组合。
+
+#### 两者如何共存（本插件的姿态）
+
+- 本插件**不使用**官方的 `ctx.sessionTitle.register()` seam —— 那个 seam 只允许注册一个提供方、第二次注册会立即抛错；
+  本插件直接 append 官方 `session/title` 事件，因此**可与官方并存**。
+- 它写的事件 **seq 更大**（在 `turn/end` 之后，而官方在首条消息时）⇒ **官方那条即使侥幸成功，也会被本插件覆盖**。
+- 包内 `cordis.patch.yml` **默认把官方关掉**（`- id: session-title-llm` + `disabled: true`），
+  省掉每个新会话那次注定失败的 64-token 调用。想保留官方（例如改用官方 DeepSeek 适配器的路由，
+  或自行把它的 `maxOutputTokens` 调大），把该文件里那两行注释掉即可。
+
 ### 行为
 
 - **触发**：`turn/end` 且 `turn >= 1`。`turn === 1` 是**第一次机会**；**成功落库后永久冻结**（后续轮次被幂等守卫跳过）。第一次机会失败时，允许在后续轮次重试，上限 `maxAttempts`。
@@ -126,6 +167,34 @@ A **host-only** DSH plugin that names a main session **once**, right after its f
 - **Persist**: `session.append("session/title", …)` with `source.kind = "provider"`, so the sidebar renames itself (higher-seq-wins) without a page reload. Manual renames are never overwritten.
 - **Failures degrade** to DSH's built-in fallback name with a single `warn` line; `apply` never throws.
 
+### How it differs from the official first-prompt provider
+
+DSH 0.2.0 ships `@deepseek-ai/dsh-session-title-first-prompt-llm` (the "official" one). Both write the **same** event
+(`session/title` with `source.kind = "provider"`), so they can coexist (higher-seq-wins) — but their behaviour differs:
+
+| | Official first-prompt | This plugin (first-turn) |
+|---|---|---|
+| **Trigger** | the first eligible **human message** (before any answer exists) | `turn/end` with `turn >= 1` (after the first answer) |
+| **Material sent** | **that single human message** (logged payload: `messageSeqs:[first]`) | **first question + first-turn assistant text**, wrapped in one JSON body (question gets 60% of the budget) |
+| **Input cap** | `maxInputBytes: 4096` | `maxInputBytes` default **8192** (configurable 256–1,000,000) |
+| **Output cap** | **64 tokens** | **2048 tokens** |
+| **Disabling "thinking"** | delegated to the **adapter** via `purpose: 'session-title'` — only the official DeepSeek adapter implements it | needs no adapter-specific behaviour; the budget simply leaves room for reasoning |
+| **On failure** | keeps the fallback, **no automatic retry** (explicit `refresh()` only) | retries up to `maxAttempts` (default 3), then gives up silently |
+| **fork / child sessions** | forks don't run it (they inherit the seed title) | main sessions only (`parentSession` empty, `delegationDepth` 0); subagent / teammate / fork untouched |
+| **Measured on this host** | **always fails**: `status: incomplete`, `reasoning_tokens: 64`, no output ⇒ the session stays on the fallback | works reliably (e.g. `"抖音账号管理器编码代理会话"`) |
+
+**Why the official provider always fails here**: its fixed 64-token budget assumes the adapter disables thinking for
+`purpose: 'session-title'`. This host routes through **pi-ai** (a local OpenAI-Responses proxy), which has no such
+purpose-specific behaviour, and `deepseek-v4.1-flash`'s reasoning cannot be turned off ⇒ all 64 tokens go to reasoning
+and the provider receives empty output. Reproducing the very same request against the local proxy:
+64 tokens → `status: incomplete` with `reasoning_tokens: 64` and no message; 1024 tokens → `completed` with a real title.
+So it is not a model or network problem — it is the "official 64-token default × a route that cannot disable thinking" combination.
+
+**Coexistence**: this plugin does **not** use the `ctx.sessionTitle.register()` seam (which allows only one provider and
+throws on a second registration). It appends the official `session/title` event directly, and always with a **later seq**
+than the official one (`turn/end` vs. first message), so even a lucky official title gets overridden. Its bundled
+`cordis.patch.yml` disables the official provider by default; comment out those two lines to keep both.
+
 ### Install
 
 ```bash
@@ -140,7 +209,7 @@ The package declares `dsh.bundle.patch`, so `dsh plugin` also records it in `dsh
 
 ### Compatibility
 
-Tested on DSH desktop `0.1.7-rc.2` (Windows). Uses `llm` (`ctx.llm.stream`) and subscribes to `session/event` / `session/disposed`. No npm dependencies, no build step, and — being host-only — it takes no part in the renderer's all-or-nothing "every client entry must activate" boot gate.
+Tested on DSH desktop **`0.2.0-rc.2`** (Windows, re-checked 2026-10-04); previously verified on `0.1.7-rc.2`. Uses `llm` (`ctx.llm.stream`) and subscribes to `session/event` / `session/disposed` — it never reads the session log, so the 0.2.0 deprecation of `snapshotEvents`/`eventAt`/`ownEvents` does not affect it. No npm dependencies, no build step, and — being host-only — it takes no part in the renderer's all-or-nothing "every client entry must activate" boot gate.
 
 ### Tests
 
